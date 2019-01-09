@@ -79,96 +79,100 @@ class Chip:
 
 
     # Instructions
-    def _0NNN(self, address):
-        """
-        Execute subroutine at NNN.
-        """
-        pass
-
     def _00E0(self):
         """
         Clear the screen.
         """
-        pass
+        self.display = [0] * 64 * 32
 
     def _00EE(self):
         """
         Return from a subroutine.
         """
-        pass
+        self.program_counter = self.stack.pop()
 
     def _1NNN(self, address):
         """
         Jump to address NNN.
         """
-        pass
+        self.program_counter = address
 
     def _2NNN(self, address):
         """
         Execute subroutine starting at address NNN.
         """
-        pass
+        self.stack.push(self.program_counter)
+        self.program_counter = address
 
     def _3XNN(self, vx, value):
         """
         Skip the following instruction if VX = NN. 
         """
-        pass
+        if self.registers[vx] == value:
+            self.program_counter += 2
 
     def _4XNN(self, vx, value):
         """
         Skip the following instruction if VX != NN.
         """
-        pass
+        if self.registers[vx] != value:
+            self.program_counter += 2
 
     def _5XY0(self, vx, vy):
         """
         Skip the following instruction if VX = VY. 
         """
-        pass
+        if self.registers[vx] == self.registers[vy]:
+            self.program_counter += 2
 
     def _6XNN(self, vx, value):
         """
         Set VX = value. 
         """
-        pass
+        self.registers[vx] = value
 
     def _7XNN(self, vx, value):
         """
         Set VX = VX + value. 
         """
-        pass
+        self.registers[vx] = self.registers[vx] + value
 
     def _8XY0(self, vx, vy):
         """
         Set VX = VY.
         """
-        pass
+        self.registers[vx] = self.registers[vy]
 
     def _8XY1(self, vx, vy):
         """
         Set VX = VX OR VY.
         """
-        pass
+        self.registers[vx] = self.registers[vx] | self.registers[vy]
 
     def _8XY2(self, vx, vy):
         """
         Set VX = VX AND VY.
         """
-        pass
+        self.registers[vx] = self.registers[vx] & self.registers[vy]
     
     def _8XY3(self, vx, vy):
         """
         Set VX = VX XOR VY.
         """
-        pass
+        self.registers[vx] = self.registers[vx] ^ self.registers[vy]
     
     def _8XY4(self, vx, vy):
         """
         Set VX = VX + VY.
         Set VF to 01 if there is a carry, 01 otherwise. 
         """
-        pass
+        add = self.registers[vx] + self.registers[vy]
+        if (add & 15) != add:
+            self.registers[15] = 1
+        else:
+            self.registers[15] = 0
+            
+        self.registers[vx] = add
     
     def _8XY5(self, vx, vy):
         """
@@ -182,7 +186,8 @@ class Chip:
         Set VX = VY >> 1 (right shift). 
         Set VF to LSB of VY prior to shift. 
         """
-        pass
+        self.registers[vx] = self.registers[vy] >> 1
+        self.registers[15] = this._lsb(self.registers[vy])
     
     def _8XY7(self, vx, vy):
         """
@@ -196,25 +201,27 @@ class Chip:
         Set VX = VY << 1 (left shift).
         Set VF to MSB of VY prior to shift. 
         """
-        pass
+        self.registers[vx] = self.registers[vy] << 1
+        self.registers[15] = this._msb(self.registers[vy])
 
     def _9XY0(self, vx, vy):
         """
         Skip the following instruction if VX != VY.
         """
-        pass
+        if self.registers[vx] != self.registers[vy]:
+            self.program_counter += 2
 
     def _ANNN(self, address):
         """
         Set I = NNN. 
         """
-        pass
+        self.i = address
 
     def _BNNN(self, address):
         """
         Jump to NNN + V0. 
         """
-        pass
+        self.program_counter = address + self.registers[0]
 
     def _CXNN(self, vx, value):
         """
@@ -245,7 +252,7 @@ class Chip:
         """
         Store the current value of the delay timer in VX. 
         """
-        pass
+        self.registers[vx] = self.delay_timer
 
     def _FX0A(self, vx):
         """
@@ -257,19 +264,19 @@ class Chip:
         """
         Set delay timer = VX. 
         """
-        pass
+        self.delay_timer = self.registers[vx]
 
     def _FX18(self, vx):
         """
         Set sound timer = VX. 
         """
-        pass
+        self.sound_timer = self.registers[vx]
     
     def _FX1E(self, vx):
         """
         Set I = I + VX.
         """
-        pass
+        self.i = self.i + self.registers[vx]
 
     def _FX20(self, vx):
         """ 
@@ -294,6 +301,13 @@ class Chip:
         Fill registers V0 - VX (inclusive) with values starting at address I. 
         """
         pass
+
+    # Utility functions
+    def _msb(n):
+        return n >> (n.bit_length() - 8)
+
+    def _lsb(n):
+        return n & 1
     
 if __name__ == "__main__":
     chip = Chip()

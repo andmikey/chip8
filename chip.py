@@ -179,7 +179,15 @@ class Chip:
         Set VX = VX - VY. 
         Set VF to 00 if there is a borrow, 01 otherwise. 
         """
-        pass
+        vx = self.registers[vx]
+        vy = self.registers[vy]
+
+        if (vx < vy):
+            self.registers[15] = 0
+        else:
+            self.registers[15] = 1
+
+        self.registers[vx] = vx - vy
     
     def _8XY6(self, vx, vy):
         """
@@ -194,7 +202,15 @@ class Chip:
         Set VX = VY - VX.
         Set VF to 00 if there is a borrow, 01 otherwise. 
         """
-        pass
+        vx = self.registers[vx]
+        vy = self.registers[vy]
+
+        if (vx > vy):
+            self.registers[15] = 0
+        else:
+            self.registers[15] = 1
+
+        self.registers[vx] = vy - vx
 
     def _8XYE(self, vx, vy):
         """
@@ -240,13 +256,15 @@ class Chip:
         """
         Skip the following instruction if key of value VX is currently pressed.
         """
-        pass
+        if self.inputs[vx]:
+            self.program_counter += 2
 
     def _EXA1(self, vx):
         """
         Skip the following instruction if key of value VX is not currently pressed. 
         """
-        pass
+        if not self.inputs[vx]:
+            self.program_counter += 2
 
     def _FX07(self, vx):
         """

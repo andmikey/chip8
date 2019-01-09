@@ -2,6 +2,7 @@
 Chip-8 emulator. 
 """
 import logging
+import random
 logging.basicConfig(level = logging.INFO)
 
 class Chip:
@@ -25,7 +26,7 @@ class Chip:
         # Stack itself - 16 16-bit values
         self.stack = [0] * 16
         # Index register
-        self.i = 0
+        self.index = 0
         
         # Outputs
         # 64x32 display
@@ -54,6 +55,10 @@ class Chip:
              0xF0, 0x80, 0xF0, 0x80, 0xF0, # E
              0xF0, 0x80, 0xF0, 0x80, 0x80  # F
             ]
+
+        # Set sprites to be in first 16 * 5 locations in memory
+        for i in range(0, (16 * 5) + 1):
+            self.ram[i] = sprites[i]
         
     def read_rom(self, rom_path):
         """
@@ -83,6 +88,7 @@ class Chip:
         """
         Clear the screen.
         """
+        logging.info("Clearing screen")
         self.display = [0] * 64 * 32
 
     def _00EE(self):
@@ -90,17 +96,20 @@ class Chip:
         Return from a subroutine.
         """
         self.program_counter = self.stack.pop()
+        logging.info("Returning to PC: {}".format(self.program_counter))
 
     def _1NNN(self, address):
         """
         Jump to address NNN.
         """
+        logging.info("Jumping to address {}".format(address))
         self.program_counter = address
 
     def _2NNN(self, address):
         """
         Execute subroutine starting at address NNN.
         """
+        logging.info("Executing subroutine at {}".format(address))
         self.stack.push(self.program_counter)
         self.program_counter = address
 
@@ -109,6 +118,7 @@ class Chip:
         Skip the following instruction if VX = NN. 
         """
         if self.registers[vx] == value:
+            logging.info("{} = {}, skipping next instruction".format(vx, value))
             self.program_counter += 2
 
     def _4XNN(self, vx, value):
@@ -116,6 +126,7 @@ class Chip:
         Skip the following instruction if VX != NN.
         """
         if self.registers[vx] != value:
+            logging.info("{} != {}, skipping next instruction".format(vx, value))
             self.program_counter += 2
 
     def _5XY0(self, vx, vy):
@@ -123,42 +134,49 @@ class Chip:
         Skip the following instruction if VX = VY. 
         """
         if self.registers[vx] == self.registers[vy]:
+            logging.info("{} = {}, skipping next instruction".format(vx, vy))
             self.program_counter += 2
 
     def _6XNN(self, vx, value):
         """
         Set VX = value. 
         """
+        logging.info("Setting register {} to {}".format(vx, value))
         self.registers[vx] = value
 
     def _7XNN(self, vx, value):
         """
         Set VX = VX + value. 
         """
+        logging.info("Adding {} to value of register {}".format(value, vx))
         self.registers[vx] = self.registers[vx] + value
 
     def _8XY0(self, vx, vy):
         """
         Set VX = VY.
         """
+        logging.info("Setting value of register {} to value of {}".format(vx, vy))
         self.registers[vx] = self.registers[vy]
 
     def _8XY1(self, vx, vy):
         """
         Set VX = VX OR VY.
         """
+        logging.info("Setting register {} to OR {}".format(vx, vy))
         self.registers[vx] = self.registers[vx] | self.registers[vy]
 
     def _8XY2(self, vx, vy):
         """
         Set VX = VX AND VY.
         """
+        logging.info("Setting register {} to AND {}".format(vx, vy))
         self.registers[vx] = self.registers[vx] & self.registers[vy]
     
     def _8XY3(self, vx, vy):
         """
         Set VX = VX XOR VY.
         """
+        logging.info("Setting register {} to XOR {}".format(vx, vy))
         self.registers[vx] = self.registers[vx] ^ self.registers[vy]
     
     def _8XY4(self, vx, vy):
@@ -166,10 +184,13 @@ class Chip:
         Set VX = VX + VY.
         Set VF to 01 if there is a carry, 01 otherwise. 
         """
+        logging.info("Setting register {} to + {}".format(vx, vy))
         add = self.registers[vx] + self.registers[vy]
-        if (add & 15) != add:
+        if add > 0xff:
+            logging.info("Overflow, setting VF to 1")
             self.registers[15] = 1
         else:
+            logging.info("No overflow, setting VF to 0")
             self.registers[15] = 0
             
         self.registers[vx] = add
@@ -182,9 +203,13 @@ class Chip:
         vx = self.registers[vx]
         vy = self.registers[vy]
 
+        logging.info("Setting register {} to - {}".format(vx, vy))
+        
         if (vx < vy):
+            logging.info("Carry, setting VF to 0")
             self.registers[15] = 0
         else:
+            logging.info("No carry, setting VF to 1")
             self.registers[15] = 1
 
         self.registers[vx] = vx - vy
@@ -194,6 +219,7 @@ class Chip:
         Set VX = VY >> 1 (right shift). 
         Set VF to LSB of VY prior to shift. 
         """
+        logging.info("Setting register {} to {} >> 1".format(vx, vy))
         self.registers[vx] = self.registers[vy] >> 1
         self.registers[15] = this._lsb(self.registers[vy])
     
@@ -205,9 +231,13 @@ class Chip:
         vx = self.registers[vx]
         vy = self.registers[vy]
 
+        logging.info("Setting register {} to {} -".format(vx, vy))
+        
         if (vx > vy):
+            logging.info("Carry, setting VF to 0")
             self.registers[15] = 0
         else:
+            logging.info("No carry, setting VF to 1")
             self.registers[15] = 1
 
         self.registers[vx] = vy - vx
@@ -217,6 +247,7 @@ class Chip:
         Set VX = VY << 1 (left shift).
         Set VF to MSB of VY prior to shift. 
         """
+        logging.info("Setting register {} to {} << 1".format(vx, vy))
         self.registers[vx] = self.registers[vy] << 1
         self.registers[15] = this._msb(self.registers[vy])
 
@@ -225,13 +256,14 @@ class Chip:
         Skip the following instruction if VX != VY.
         """
         if self.registers[vx] != self.registers[vy]:
+            logging.info("{} != {}, skipping next instruction".format(vx, vy))
             self.program_counter += 2
 
     def _ANNN(self, address):
         """
         Set I = NNN. 
         """
-        self.i = address
+        self.index = address
 
     def _BNNN(self, address):
         """
@@ -244,7 +276,8 @@ class Chip:
         Set VX = random byte AND value.
         Random byte is 0 - 255. 
         """
-        pass
+        byte = random.randint(0, 255)
+        self.registers[vx] = byte & value
 
     def _DXYN(self, vx, vy, n):
         """
@@ -294,38 +327,55 @@ class Chip:
         """
         Set I = I + VX.
         """
-        self.i = self.i + self.registers[vx]
+        self.index = self.index + self.registers[vx]
 
     def _FX20(self, vx):
         """ 
         Set I = digit value of VX. 
         """
-        pass
+        self.index = 5 * self.registers[vx]
 
     def _FX33(self, vx):
         """
         Set addresses I, I+1, I+2 to binary-coded decimal equivalent of value in VX. 
         """
-        pass
-
+        dec = str(self.registers[vx])
+        self.memory[self.index] = dec[0]
+        self.memory[self.index + 1] = dec[1]
+        self.memory[self.index + 2] = dec[2]
+        self.index += 3
+        
     def _FX55(self, vx):
         """
         Store register values V0 - VX (inclusive) starting at address I.
         """
-        pass
+        for i in range(0, vx):
+            # TODO is this index + i or just i?
+            self.memory[self.index + i] = self.registers[i]
+            
+        self.index += i + 1
 
     def _FX65(self, vx):
         """
         Fill registers V0 - VX (inclusive) with values starting at address I. 
         """
-        pass
+        for i in range(0, vx):
+            # TODO is this index + i or just i?
+            self.registers[i] = self.memory[self.index + i]
+            
+        self.index += i + 1
+
 
     # Utility functions
     def _msb(n):
-        return n >> (n.bit_length() - 8)
+        msb = n >> (n.bit_length() - 8)
+        logging.info("MSB is {}".format(msb))
+        return msb
 
     def _lsb(n):
-        return n & 1
+        lsb = n & 1
+        logging.info("LSB is {}".format(lsb))
+        return lsb
     
 if __name__ == "__main__":
     chip = Chip()
